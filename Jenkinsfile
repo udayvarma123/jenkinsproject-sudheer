@@ -1,10 +1,6 @@
 pipeline {
   agent any
 
-  environment {
-    // Set any environment variables if needed
-  }
-
   stages {
     stage('Lock One Build Per Branch') {
       steps {
