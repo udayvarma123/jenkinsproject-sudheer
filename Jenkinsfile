@@ -1,9 +1,7 @@
 pipeline {
   agent any
 
-  options {
-    disableConcurrentBuilds()
-  }
+ 
 
   stages {
     stage('Abort Older Builds Across Branches') {
