@@ -1,12 +1,25 @@
 pipeline {
   agent any
 
+  options {
+    // Avoid concurrent builds of the *same* branch
+    disableConcurrentBuilds()
+  }
+
   stages {
-    stage('Lock One Build Per Branch') {
+    stage('Ensure Only Latest Build Runs') {
       steps {
         script {
-          lock(resource: "lock-${env.JOB_BASE_NAME}", inversePrecedence: true) {
-            echo "Running build for ${env.JOB_NAME} on branch ${env.BRANCH_NAME}"
+          def currentBuildNumber = currentBuild.number
+          def jobName = env.JOB_NAME
+          def job = Jenkins.instance.getItemByFullName(jobName)
+
+          job.getBuilds().each { build ->
+            // Skip current build
+            if (build.number != currentBuildNumber && build.isBuilding()) {
+              echo "Aborting older build #${build.number} of ${jobName}"
+              build.doStop()
+            }
           }
         }
       }
@@ -14,11 +27,10 @@ pipeline {
 
     stage('Dummy Work') {
       steps {
-        echo "Doing some work on ${env.BRANCH_NAME}..."
+        echo "Running on branch ${env.BRANCH_NAME}, build #${env.BUILD_NUMBER}"
         sleep 300 // simulate work
       }
     }
-    
   }
 
   post {
