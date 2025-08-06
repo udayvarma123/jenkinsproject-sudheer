@@ -2,40 +2,45 @@ pipeline {
   agent any
 
   options {
-    // Avoid concurrent builds of the *same* branch
     disableConcurrentBuilds()
   }
 
   stages {
-    stage('Ensure Only Latest Build Runs') {
+    stage('Abort Older Builds Across Branches') {
       steps {
         script {
+          def currentJobName = env.JOB_NAME
           def currentBuildNumber = currentBuild.number
-          def jobName = env.JOB_NAME
-          def job = Jenkins.instance.getItemByFullName(jobName)
+          def currentBranchName = env.BRANCH_NAME
 
-          job.getBuilds().each { build ->
-            // Skip current build
-            if (build.number != currentBuildNumber && build.isBuilding()) {
-              echo "Aborting older build #${build.number} of ${jobName}"
-              build.doStop()
+          // Get parent folder (multibranch job name)
+          def multibranchProjectName = currentJobName.split("/")[0]
+          def multibranchProject = Jenkins.instance.getItem(multibranchProjectName)
+
+          multibranchProject.getItems().each { branchJob ->
+            branchJob.getBuilds().each { build ->
+              def isCurrentBuild = (branchJob.fullName == currentJobName && build.number == currentBuildNumber)
+              if (!isCurrentBuild && build.isBuilding()) {
+                echo "Aborting build #${build.number} of branch ${branchJob.name}"
+                build.doKill() // Force stop
+              }
             }
           }
         }
       }
     }
 
-    stage('Dummy Work') {
+    stage('Work') {
       steps {
-        echo "Running on branch ${env.BRANCH_NAME}, build #${env.BUILD_NUMBER}"
-        sleep 300 // simulate work
+        echo "Running branch ${env.BRANCH_NAME}, build #${env.BUILD_NUMBER}"
+        sleep 300 // Simulated work
       }
     }
   }
 
   post {
     always {
-      echo "Build completed for ${env.JOB_NAME} on branch ${env.BRANCH_NAME}"
+      echo "Build complete for ${env.JOB_NAME} on branch ${env.BRANCH_NAME}"
     }
   }
 }
